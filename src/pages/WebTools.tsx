@@ -40,6 +40,26 @@ export default function WebTools() {
     }
   };
 
+  const fetchWithProxy = async (url: string) => {
+    // Try first proxy
+    try {
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const response = await fetch(proxyUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.text();
+    } catch (error) {
+      // Try second proxy if first fails
+      const corsAnywhereUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+      const response = await fetch(corsAnywhereUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.text();
+    }
+  };
+
   const analyzeWebsite = async () => {
     if (!url) {
       toast({
@@ -61,16 +81,7 @@ export default function WebTools() {
 
     setIsLoading(true);
     try {
-      // Use a CORS proxy service
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl);
-      const data = await response.json();
-      
-      if (!data.contents) {
-        throw new Error("Failed to fetch website content");
-      }
-
-      const html = data.contents;
+      const html = await fetchWithProxy(url);
 
       // Perform analysis on the HTML content
       const loadTime = Math.random() * 3 + 0.5; // Simulated load time between 0.5-3.5s
@@ -189,12 +200,12 @@ export default function WebTools() {
         description: "Website analysis completed",
       });
     } catch (error) {
+      console.error("Analysis error:", error);
       toast({
         title: "Error",
-        description: "Failed to analyze website. Please check the URL and try again.",
+        description: "Failed to analyze website. The website might be blocking access or temporarily unavailable.",
         variant: "destructive",
       });
-      console.error("Analysis error:", error);
     } finally {
       setIsLoading(false);
     }
