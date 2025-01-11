@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { AppSidebar } from "@/components/AppSidebar";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Table,
   TableBody,
@@ -80,79 +82,87 @@ export default function WebTools() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
-      <h1 className="text-3xl font-bold">Web Development Tools</h1>
-      
-      <div className="flex gap-4">
-        <Input
-          type="url"
-          placeholder="Enter website URL"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          className="max-w-xl"
-        />
-        <Button onClick={analyzeWebsite} disabled={isLoading}>
-          {isLoading ? "Analyzing..." : "Analyze Website"}
-        </Button>
-      </div>
-
-      {report.length > 0 && (
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Website Analysis Report</h2>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Metric</TableHead>
-                  <TableHead>Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {report.map((item) => (
-                  <TableRow key={item.metric}>
-                    <TableCell className="font-medium">{item.metric}</TableCell>
-                    <TableCell>{item.value}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+    <div className="min-h-screen flex w-full">
+      <AppSidebar />
+      <div className="flex-1">
+        <div className="container mx-auto p-6 space-y-8">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold">Web Development Tools</h1>
+            <SidebarTrigger />
+          </div>
+          
+          <div className="flex gap-4">
+            <Input
+              type="url"
+              placeholder="Enter website URL"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="max-w-xl"
+            />
+            <Button onClick={analyzeWebsite} disabled={isLoading}>
+              {isLoading ? "Analyzing..." : "Analyze Website"}
+            </Button>
           </div>
 
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Issues Found</h2>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Severity</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {errors.map((error, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{error.type}</TableCell>
-                    <TableCell>{error.description}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`px-2 py-1 rounded-full text-sm ${
-                          error.severity === "high"
-                            ? "bg-red-100 text-red-800"
-                            : error.severity === "medium"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-green-100 text-green-800"
-                        }`}
-                      >
-                        {error.severity}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          {report.length > 0 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-semibold mb-4">Website Analysis Report</h2>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Metric</TableHead>
+                      <TableHead>Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {report.map((item) => (
+                      <TableRow key={item.metric}>
+                        <TableCell className="font-medium">{item.metric}</TableCell>
+                        <TableCell>{item.value}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div>
+                <h2 className="text-xl font-semibold mb-4">Issues Found</h2>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Severity</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {errors.map((error, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{error.type}</TableCell>
+                        <TableCell>{error.description}</TableCell>
+                        <TableCell>
+                          <span
+                            className={`px-2 py-1 rounded-full text-sm ${
+                              error.severity === "high"
+                                ? "bg-red-100 text-red-800"
+                                : error.severity === "medium"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-green-100 text-green-800"
+                            }`}
+                          >
+                            {error.severity}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
