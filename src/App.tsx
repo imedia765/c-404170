@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import Index from "./pages/Index";
+import Repositories from "./pages/Repositories";
 import WebTools from "./pages/WebTools";
 
 const queryClient = new QueryClient();
@@ -18,7 +18,8 @@ function App() {
         <Router>
           <SidebarProvider>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<Repositories />} />
+              <Route path="/repositories" element={<Repositories />} />
               <Route path="/web-tools" element={<WebTools />} />
             </Routes>
           </SidebarProvider>

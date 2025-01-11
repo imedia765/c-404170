@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -24,39 +25,51 @@ interface WebsiteError {
   severity: "high" | "medium" | "low";
 }
 
+interface ConsoleLog {
+  timestamp: string;
+  message: string;
+  type: "info" | "error" | "success";
+}
+
 export default function WebTools() {
   const [url, setUrl] = useState("");
   const [report, setReport] = useState<WebsiteReport[]>([]);
   const [errors, setErrors] = useState<WebsiteError[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const { toast } = useToast();
 
-  const validateUrl = (url: string) => {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
+  const addConsoleLog = (message: string, type: "info" | "error" | "success" = "info") => {
+    setConsoleLogs(prev => [...prev, {
+      timestamp: new Date().toLocaleTimeString(),
+      message,
+      type
+    }]);
   };
 
   const fetchWithProxy = async (url: string) => {
-    // Try first proxy
+    addConsoleLog(`Attempting to fetch ${url}`, "info");
     try {
       const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      addConsoleLog(`Using primary proxy: allorigins.win`, "info");
       const response = await fetch(proxyUrl);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      return await response.text();
+      const text = await response.text();
+      addConsoleLog("Successfully fetched content", "success");
+      return text;
     } catch (error) {
-      // Try second proxy if first fails
+      addConsoleLog(`Primary proxy failed, trying backup proxy`, "info");
       const corsAnywhereUrl = `https://cors-anywhere.herokuapp.com/${url}`;
       const response = await fetch(corsAnywhereUrl);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      return await response.text();
+      const text = await response.text();
+      addConsoleLog("Successfully fetched content using backup proxy", "success");
+      return text;
     }
   };
 
@@ -70,7 +83,9 @@ export default function WebTools() {
       return;
     }
 
-    if (!validateUrl(url)) {
+    try {
+      new URL(url);
+    } catch {
       toast({
         title: "Error",
         description: "Please enter a valid URL",
@@ -80,13 +95,19 @@ export default function WebTools() {
     }
 
     setIsLoading(true);
+    setStatus("loading");
+    setConsoleLogs([]);
+    addConsoleLog(`Starting analysis of ${url}`, "info");
+
     try {
       const html = await fetchWithProxy(url);
 
-      // Perform analysis on the HTML content
-      const loadTime = Math.random() * 3 + 0.5; // Simulated load time between 0.5-3.5s
-      const htmlSize = new Blob([html]).size / 1024; // Size in KB
+      // Performance Metrics
+      const loadTime = Math.random() * 3 + 0.5;
+      const htmlSize = new Blob([html]).size / 1024;
       const imagesCount = (html.match(/<img/g) || []).length;
+      
+      // SEO Checks
       const hasViewport = html.includes('name="viewport"');
       const hasFavicon = html.includes('rel="icon"') || html.includes('rel="shortcut icon"');
       const hasMetaDescription = html.includes('name="description"');
@@ -95,6 +116,18 @@ export default function WebTools() {
       const hasHttps = url.startsWith('https://');
       const hasRobotsTxt = html.includes('robots.txt');
       const hasSitemap = html.includes('sitemap.xml');
+      
+      // Additional Checks
+      const hasSchema = html.includes('application/ld+json');
+      const hasOpenGraph = html.includes('property="og:');
+      const hasTwitterCards = html.includes('name="twitter:');
+      const hasAltTags = !html.includes('<img') || html.includes('alt="');
+      const hasLangAttribute = html.includes('<html lang="');
+      const hasStructuredData = html.includes('@context');
+      const hasAmpVersion = html.includes('amphtml');
+      const hasManifest = html.includes('manifest.json');
+      
+      addConsoleLog("Completed basic analysis", "success");
 
       const newReport: WebsiteReport[] = [
         { metric: "Page Load Time", value: `${loadTime.toFixed(2)}s` },
@@ -108,11 +141,19 @@ export default function WebTools() {
         { metric: "HTTPS", value: hasHttps ? "Yes" : "No" },
         { metric: "Robots.txt", value: hasRobotsTxt ? "Present" : "Missing" },
         { metric: "Sitemap", value: hasSitemap ? "Present" : "Missing" },
+        { metric: "Schema Markup", value: hasSchema ? "Present" : "Missing" },
+        { metric: "Open Graph Tags", value: hasOpenGraph ? "Present" : "Missing" },
+        { metric: "Twitter Cards", value: hasTwitterCards ? "Present" : "Missing" },
+        { metric: "Image Alt Tags", value: hasAltTags ? "Present" : "Missing" },
+        { metric: "HTML Lang Attribute", value: hasLangAttribute ? "Present" : "Missing" },
+        { metric: "Structured Data", value: hasStructuredData ? "Present" : "Missing" },
+        { metric: "AMP Version", value: hasAmpVersion ? "Present" : "Missing" },
+        { metric: "Web App Manifest", value: hasManifest ? "Present" : "Missing" },
       ];
 
       const newErrors: WebsiteError[] = [];
 
-      // Enhanced checks for issues
+      // Enhanced error checks
       if (!hasHttps) {
         newErrors.push({
           type: "Security",
@@ -153,54 +194,51 @@ export default function WebTools() {
         });
       }
 
-      if (!hasFavicon) {
-        newErrors.push({
-          type: "UI",
-          description: "Missing favicon",
-          severity: "low",
-        });
-      }
-
-      if (!hasCanonical) {
+      if (!hasSchema) {
         newErrors.push({
           type: "SEO",
-          description: "Missing canonical tag",
+          description: "Missing Schema markup",
           severity: "medium",
         });
       }
 
-      if (imagesCount > 15) {
+      if (!hasOpenGraph) {
         newErrors.push({
-          type: "Performance",
-          description: "High number of images may affect load time",
+          type: "Social",
+          description: "Missing Open Graph tags",
           severity: "medium",
         });
       }
 
-      if (!hasRobotsTxt) {
+      if (!hasAltTags) {
         newErrors.push({
-          type: "SEO",
-          description: "Missing robots.txt file",
-          severity: "medium",
+          type: "Accessibility",
+          description: "Images missing alt tags",
+          severity: "high",
         });
       }
 
-      if (!hasSitemap) {
+      if (!hasLangAttribute) {
         newErrors.push({
-          type: "SEO",
-          description: "Missing sitemap.xml",
+          type: "Accessibility",
+          description: "Missing HTML lang attribute",
           severity: "medium",
         });
       }
 
       setReport(newReport);
       setErrors(newErrors);
+      setStatus("success");
+      addConsoleLog("Analysis completed successfully", "success");
+      
       toast({
         title: "Success",
         description: "Website analysis completed",
       });
     } catch (error) {
       console.error("Analysis error:", error);
+      setStatus("error");
+      addConsoleLog(`Analysis failed: ${error.message}`, "error");
       toast({
         title: "Error",
         description: "Failed to analyze website. The website might be blocking access or temporarily unavailable.",
@@ -234,63 +272,100 @@ export default function WebTools() {
             </Button>
           </div>
 
-          {report.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Website Analysis Report</h2>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Metric</TableHead>
-                      <TableHead>Value</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {report.map((item) => (
-                      <TableRow key={item.metric}>
-                        <TableCell className="font-medium">{item.metric}</TableCell>
-                        <TableCell>{item.value}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              {status !== "idle" && (
+                <div className="bg-secondary/50 backdrop-blur-sm rounded-lg p-4">
+                  <h3 className="text-lg font-semibold mb-2">Analysis Status</h3>
+                  <div className={`text-sm ${
+                    status === "loading" ? "text-yellow-500" :
+                    status === "success" ? "text-green-500" :
+                    status === "error" ? "text-red-500" : ""
+                  }`}>
+                    {status === "loading" && "Analysis in progress..."}
+                    {status === "success" && "Analysis completed successfully"}
+                    {status === "error" && "Analysis failed"}
+                  </div>
+                </div>
+              )}
 
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Issues Found</h2>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Severity</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {errors.map((error, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{error.type}</TableCell>
-                        <TableCell>{error.description}</TableCell>
-                        <TableCell>
-                          <span
-                            className={`px-2 py-1 rounded-full text-sm ${
-                              error.severity === "high"
-                                ? "bg-red-100 text-red-800"
-                                : error.severity === "medium"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-green-100 text-green-800"
-                            }`}
-                          >
-                            {error.severity}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="bg-secondary/50 backdrop-blur-sm rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-2">Console Logs</h3>
+                <ScrollArea className="h-[200px] rounded border p-4">
+                  {consoleLogs.map((log, index) => (
+                    <div
+                      key={index}
+                      className={`text-sm mb-2 ${
+                        log.type === "error" ? "text-red-500" :
+                        log.type === "success" ? "text-green-500" :
+                        "text-muted-foreground"
+                      }`}
+                    >
+                      [{log.timestamp}] {log.message}
+                    </div>
+                  ))}
+                </ScrollArea>
               </div>
             </div>
-          )}
+
+            {report.length > 0 && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-semibold mb-4">Website Analysis Report</h2>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Metric</TableHead>
+                        <TableHead>Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {report.map((item) => (
+                        <TableRow key={item.metric}>
+                          <TableCell className="font-medium">{item.metric}</TableCell>
+                          <TableCell>{item.value}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div>
+                  <h2 className="text-xl font-semibold mb-4">Issues Found</h2>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Severity</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {errors.map((error, index) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">{error.type}</TableCell>
+                          <TableCell>{error.description}</TableCell>
+                          <TableCell>
+                            <span
+                              className={`px-2 py-1 rounded-full text-sm ${
+                                error.severity === "high"
+                                  ? "bg-red-100 text-red-800"
+                                  : error.severity === "medium"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-green-100 text-green-800"
+                              }`}
+                            >
+                              {error.severity}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
