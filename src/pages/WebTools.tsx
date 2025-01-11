@@ -61,11 +61,18 @@ export default function WebTools() {
 
     setIsLoading(true);
     try {
-      // Simulate API call with fetch
-      const response = await fetch(url);
-      const html = await response.text();
+      // Use a CORS proxy service
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const response = await fetch(proxyUrl);
+      const data = await response.json();
+      
+      if (!data.contents) {
+        throw new Error("Failed to fetch website content");
+      }
 
-      // Perform actual analysis
+      const html = data.contents;
+
+      // Perform analysis on the HTML content
       const loadTime = Math.random() * 3 + 0.5; // Simulated load time between 0.5-3.5s
       const htmlSize = new Blob([html]).size / 1024; // Size in KB
       const imagesCount = (html.match(/<img/g) || []).length;
@@ -74,6 +81,9 @@ export default function WebTools() {
       const hasMetaDescription = html.includes('name="description"');
       const hasH1 = html.includes("<h1");
       const hasCanonical = html.includes('rel="canonical"');
+      const hasHttps = url.startsWith('https://');
+      const hasRobotsTxt = html.includes('robots.txt');
+      const hasSitemap = html.includes('sitemap.xml');
 
       const newReport: WebsiteReport[] = [
         { metric: "Page Load Time", value: `${loadTime.toFixed(2)}s` },
@@ -84,11 +94,22 @@ export default function WebTools() {
         { metric: "Favicon", value: hasFavicon ? "Present" : "Missing" },
         { metric: "H1 Tag", value: hasH1 ? "Present" : "Missing" },
         { metric: "Canonical Tag", value: hasCanonical ? "Present" : "Missing" },
+        { metric: "HTTPS", value: hasHttps ? "Yes" : "No" },
+        { metric: "Robots.txt", value: hasRobotsTxt ? "Present" : "Missing" },
+        { metric: "Sitemap", value: hasSitemap ? "Present" : "Missing" },
       ];
 
       const newErrors: WebsiteError[] = [];
 
-      // Check for potential issues
+      // Enhanced checks for issues
+      if (!hasHttps) {
+        newErrors.push({
+          type: "Security",
+          description: "Website is not using HTTPS",
+          severity: "high",
+        });
+      }
+
       if (loadTime > 2) {
         newErrors.push({
           type: "Performance",
@@ -145,6 +166,22 @@ export default function WebTools() {
         });
       }
 
+      if (!hasRobotsTxt) {
+        newErrors.push({
+          type: "SEO",
+          description: "Missing robots.txt file",
+          severity: "medium",
+        });
+      }
+
+      if (!hasSitemap) {
+        newErrors.push({
+          type: "SEO",
+          description: "Missing sitemap.xml",
+          severity: "medium",
+        });
+      }
+
       setReport(newReport);
       setErrors(newErrors);
       toast({
@@ -157,6 +194,7 @@ export default function WebTools() {
         description: "Failed to analyze website. Please check the URL and try again.",
         variant: "destructive",
       });
+      console.error("Analysis error:", error);
     } finally {
       setIsLoading(false);
     }
